@@ -1,0 +1,76 @@
+body {
+    font-family: 'Inter', sans-serif;
+}
+.card {
+    background-color: white;
+    border-radius: 0.75rem;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.3s, box-shadow 0.3s;
+}
+.btn-primary {
+    background-color: #4f46e5;
+    color: white;
+}
+.btn-primary:hover {
+    background-color: #4338ca;
+}
+.btn-secondary {
+    background-color: #e5e7eb;
+    color: #374151;
+}
+.btn-secondary:hover {
+    background-color: #d1d5db;
+}
+.btn:disabled {
+    background-color: #d1d5db;
+    color: #9ca3af;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+.btn-primary:disabled {
+    background-color: #d1d5db;
+    color: #9ca3af;
+}
+.input-field {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+.input-field:focus {
+    outline: none;
+    border-color: #4f46e5;
+    box-shadow: 0 0 0 2px #c7d2fe;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th, td {
+    border: 1px solid #d1d5db;
+    padding: 0.75rem;
+    text-align: left;
+}
+
+th {
+    background-color: #f3f4f6;
+}
+
+/* Alternate row colors - but not for summary rows */
+tbody tr:nth-child(even):not(.summary-row) {
+    background-color: #f9fafb;
+}
