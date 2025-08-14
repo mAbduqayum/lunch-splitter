@@ -298,9 +298,13 @@ function renderItems() {
     dom.itemsListDiv.innerHTML = state.items.map(item => {
         const quantityInputsHTML = state.people.map(person => {
             const currentQuantity = item.personQuantities?.[person.id] || '';
-            const totalQuantities = Object.values(item.personQuantities || {}).reduce((sum, qty) => sum + qty, 0);
-            const personAmount = totalQuantities > 0 && currentQuantity > 0 ? 
-                (currentQuantity / totalQuantities) * item.price : 0;
+            const totalQuantities = Object.values(item.personQuantities || {}).reduce((sum, qty) => {
+                const numQty = parseFloat(qty) || 0;
+                return sum + numQty;
+            }, 0);
+            const numCurrentQuantity = parseFloat(currentQuantity) || 0;
+            const personAmount = totalQuantities > 0 && numCurrentQuantity > 0 ? 
+                (numCurrentQuantity / totalQuantities) * item.price : 0;
             
             return `
                 <div class="flex items-center mr-4 mb-2">
@@ -312,13 +316,16 @@ function renderItems() {
                            min="0"
                            value="${currentQuantity}"
                            onchange="updatePersonQuantity(${item.id}, ${person.id}, this.value)"
-                           oninput="updatePersonQuantity(${item.id}, ${person.id}, this.value)">
-                    ${currentQuantity > 0 ? `<span class="text-xs text-gray-500 ml-1">($${personAmount.toFixed(2)})</span>` : ''}
+                           onblur="updatePersonQuantity(${item.id}, ${person.id}, this.value)">
+                    ${numCurrentQuantity > 0 ? `<span class="text-xs text-gray-500 ml-1">($${personAmount.toFixed(2)})</span>` : ''}
                 </div>
             `;
         }).join('');
 
-        const totalQuantities = Object.values(item.personQuantities || {}).reduce((sum, qty) => sum + qty, 0);
+        const totalQuantities = Object.values(item.personQuantities || {}).reduce((sum, qty) => {
+            const numQty = parseFloat(qty) || 0;
+            return sum + numQty;
+        }, 0);
         const actionButtonsHTML = state.people.length > 0 ? `
             <div class="flex gap-2 mb-2">
                 <button class="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600" 
@@ -370,13 +377,17 @@ function calculateAndRenderSplit() {
     // Calculate individual shares based on quantities
     state.items.forEach(item => {
         if (item.personQuantities) {
-            const totalQuantities = Object.values(item.personQuantities).reduce((sum, qty) => sum + qty, 0);
+            const totalQuantities = Object.values(item.personQuantities).reduce((sum, qty) => {
+                const numQty = parseFloat(qty) || 0;
+                return sum + numQty;
+            }, 0);
             if (totalQuantities > 0) {
                 const pricePerUnit = item.price / totalQuantities;
                 Object.entries(item.personQuantities).forEach(([personId, quantity]) => {
                     const person = personTotals.find(p => p.id === parseInt(personId));
-                    if (person && quantity > 0) {
-                        person.subtotal += quantity * pricePerUnit;
+                    const numQuantity = parseFloat(quantity) || 0;
+                    if (person && numQuantity > 0) {
+                        person.subtotal += numQuantity * pricePerUnit;
                     }
                 });
             }
@@ -399,7 +410,10 @@ function calculateAndRenderSplit() {
 
     // Item rows
     state.items.forEach(item => {
-        const totalQuantities = Object.values(item.personQuantities || {}).reduce((sum, qty) => sum + qty, 0);
+        const totalQuantities = Object.values(item.personQuantities || {}).reduce((sum, qty) => {
+            const numQty = parseFloat(qty) || 0;
+            return sum + numQty;
+        }, 0);
         const pricePerUnit = totalQuantities > 0 ? item.price / totalQuantities : 0;
         
         tableHTML += `
@@ -407,9 +421,10 @@ function calculateAndRenderSplit() {
                 <td class="py-2 px-4 font-medium">${item.name}<br><span class="text-sm text-gray-600">($${item.price.toFixed(2)})</span></td>
                 ${personTotals.map(person => {
                     const personQuantity = item.personQuantities?.[person.id];
-                    if (personQuantity && personQuantity > 0) {
-                        const personAmount = personQuantity * pricePerUnit;
-                        return `<td class="py-2 px-4 text-center">${personQuantity}× = ${personAmount.toFixed(2)}</td>`;
+                    const numPersonQuantity = parseFloat(personQuantity) || 0;
+                    if (personQuantity && numPersonQuantity > 0) {
+                        const personAmount = numPersonQuantity * pricePerUnit;
+                        return `<td class="py-2 px-4 text-center">${numPersonQuantity}× = ${personAmount.toFixed(2)}</td>`;
                     }
                     return '<td class="py-2 px-4 text-center">-</td>';
                 }).join('')}
