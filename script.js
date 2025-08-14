@@ -23,7 +23,6 @@ function initializeApp() {
     dom.itemsListDiv = document.getElementById('items-list');
     dom.taxInput = document.getElementById('tax-percent');
     dom.tipInput = document.getElementById('tip-percent');
-    dom.calculateBtn = document.getElementById('calculate-btn');
     dom.resultsSection = document.getElementById('results-section');
     dom.clearBtn = document.getElementById('clear-btn');
     dom.exportBtn = document.getElementById('export-btn');
@@ -59,7 +58,6 @@ function setupEventListeners() {
     });
 
     // Actions
-    dom.calculateBtn.addEventListener('click', calculateAndRenderSplit);
     dom.exportBtn.addEventListener('click', exportSummaryAsImage);
     dom.clearBtn.addEventListener('click', clearState);
 }
@@ -94,6 +92,7 @@ function handleAddPerson() {
         state.people.push({ id: state.nextPersonId++, name });
         dom.personNameInput.value = '';
         render();
+        calculateAndRenderSplit();
         saveState();
     }
 }
@@ -107,6 +106,7 @@ function deletePerson(personId) {
         )
     }));
     render();
+    calculateAndRenderSplit();
     saveState();
 }
 
@@ -130,6 +130,7 @@ function editPersonName(personId) {
             const personIndex = state.people.findIndex(p => p.id === personId);
             if (personIndex !== -1) {
                 state.people[personIndex].name = newName;
+                calculateAndRenderSplit();
                 saveState();
             }
         }
@@ -160,6 +161,7 @@ function handleAddItem() {
         dom.itemPriceInput.value = '';
         dom.itemNameInput.focus();
         render();
+        calculateAndRenderSplit();
         saveState();
     } else {
         showToast('Please enter a valid item name and price.', 'error');
@@ -169,6 +171,7 @@ function handleAddItem() {
 function deleteItem(itemId) {
     state.items = state.items.filter(i => i.id !== itemId);
     render();
+    calculateAndRenderSplit();
     saveState();
 }
 
@@ -253,6 +256,7 @@ function editItem(itemId) {
         }
 
         if (hasChanges) {
+            calculateAndRenderSplit();
             saveState();
         }
         isEditingItem = false;
@@ -364,7 +368,7 @@ function renderItems() {
 
 function calculateAndRenderSplit() {
     if (state.people.length === 0) {
-        dom.resultsSection.innerHTML = '<p class="text-center text-gray-500">Click "Calculate Bill" to see the breakdown.</p>';
+        dom.resultsSection.innerHTML = '<p class="text-center text-gray-500">Add people and items to see the breakdown.</p>';
         return;
     }
 
@@ -593,8 +597,8 @@ function clearState() {
 async function exportSummaryAsImage() {
     try {
         const cardElement = document.getElementById('results-section');
-        if (!cardElement || cardElement.innerHTML.includes('Click "Calculate Bill"')) {
-            showToast('Please calculate the bill first before exporting.', 'error');
+        if (!cardElement || cardElement.innerHTML.includes('Add people and items to see the breakdown')) {
+            showToast('Please add people and items first before exporting.', 'error');
             return;
         }
 
