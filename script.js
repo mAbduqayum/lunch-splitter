@@ -316,7 +316,7 @@ function renderItems() {
                     <input type="number" 
                            class="input-field text-sm py-1 px-2 w-16" 
                            placeholder="0" 
-                           step="0.01" 
+                           step="1" 
                            min="0"
                            value="${currentQuantity}"
                            onchange="updatePersonQuantity(${item.id}, ${person.id}, this.value)"
