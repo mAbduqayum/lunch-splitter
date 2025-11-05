@@ -534,9 +534,39 @@ function saveState() {
 // --- URL SHARING ---
 function generateShareableURL() {
     try {
-        const compressed = btoa(encodeURIComponent(JSON.stringify(state)));
         const url = new URL(window.location.origin + window.location.pathname);
-        url.searchParams.set('data', compressed);
+
+        // People: comma-separated names
+        if (state.people.length > 0) {
+            url.searchParams.set('p', state.people.map(p => p.name).join(','));
+        }
+
+        // Items: format "name:price" separated by semicolons
+        if (state.items.length > 0) {
+            const itemsStr = state.items.map(item => `${item.name}:${item.price}`).join(';');
+            url.searchParams.set('i', itemsStr);
+        }
+
+        // Quantities: format "itemIndex-personIndex:quantity" separated by semicolons
+        const quantities = [];
+        state.items.forEach((item, itemIdx) => {
+            if (item.personQuantities) {
+                state.people.forEach((person, personIdx) => {
+                    const qty = item.personQuantities[person.id];
+                    if (qty) {
+                        quantities.push(`${itemIdx}-${personIdx}:${qty}`);
+                    }
+                });
+            }
+        });
+        if (quantities.length > 0) {
+            url.searchParams.set('q', quantities.join(';'));
+        }
+
+        // Tax and tip
+        if (state.tax) url.searchParams.set('tax', state.tax);
+        if (state.tip) url.searchParams.set('tip', state.tip);
+
         return url.toString();
     } catch (error) {
         console.error("Error generating shareable URL:", error);
@@ -570,11 +600,69 @@ function copyShareLink() {
 function loadStateFromURL() {
     try {
         const urlParams = new URLSearchParams(window.location.search);
-        const compressed = urlParams.get('data');
-        if (compressed) {
-            const decompressed = JSON.parse(decodeURIComponent(atob(compressed)));
+
+        // Check for old base64 format first (backwards compatibility)
+        const oldData = urlParams.get('data');
+        if (oldData) {
+            const decompressed = JSON.parse(decodeURIComponent(atob(oldData)));
             return decompressed;
         }
+
+        // Check for new readable format
+        const peopleParam = urlParams.get('p');
+        const itemsParam = urlParams.get('i');
+
+        if (!peopleParam && !itemsParam) {
+            return null; // No data in URL
+        }
+
+        const newState = {
+            people: [],
+            items: [],
+            nextPersonId: 0,
+            nextItemId: 0,
+            tax: parseFloat(urlParams.get('tax')) || 0,
+            tip: parseFloat(urlParams.get('tip')) || 10
+        };
+
+        // Parse people
+        if (peopleParam) {
+            newState.people = peopleParam.split(',').map((name, idx) => ({
+                id: idx,
+                name: name.trim()
+            }));
+            newState.nextPersonId = newState.people.length;
+        }
+
+        // Parse items
+        if (itemsParam) {
+            newState.items = itemsParam.split(';').map((itemStr, idx) => {
+                const [name, price] = itemStr.split(':');
+                return {
+                    id: idx,
+                    name: name.trim(),
+                    price: parseFloat(price) || 0,
+                    personQuantities: {}
+                };
+            });
+            newState.nextItemId = newState.items.length;
+        }
+
+        // Parse quantities
+        const quantitiesParam = urlParams.get('q');
+        if (quantitiesParam && newState.items.length > 0 && newState.people.length > 0) {
+            quantitiesParam.split(';').forEach(qtyStr => {
+                const [indices, qty] = qtyStr.split(':');
+                const [itemIdx, personIdx] = indices.split('-').map(Number);
+
+                if (newState.items[itemIdx] && newState.people[personIdx]) {
+                    const personId = newState.people[personIdx].id;
+                    newState.items[itemIdx].personQuantities[personId] = parseFloat(qty);
+                }
+            });
+        }
+
+        return newState;
     } catch (error) {
         console.error("Error loading from URL:", error);
         showToast('Error loading data from URL.', 'error');
