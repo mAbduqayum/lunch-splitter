@@ -50,9 +50,9 @@ function setupEventListeners() {
     dom.itemNameInput.addEventListener('keypress', (e) => e.key === 'Enter' && handleAddItem());
     dom.itemPriceInput.addEventListener('keypress', (e) => e.key === 'Enter' && handleAddItem());
     dom.itemNameInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Tab' && e.shiftKey && !dom.personNameInput.value.trim()) {
+        if (e.key === 'Tab' && e.shiftKey && !dom.itemNameInput.value.trim()) {
             e.preventDefault();
-            // Focus on person-name input when shift+tabbing and username is empty
+            // Focus on person-name input when shift+tabbing and item name is empty
             dom.personNameInput.focus();
         }
     });
