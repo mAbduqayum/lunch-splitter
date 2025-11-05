@@ -8,6 +8,19 @@ const state = {
     tip: 10
 };
 
+// --- UTILITIES ---
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
 // --- DOM ELEMENTS (cached on initialization) ---
 const dom = {};
 
@@ -26,7 +39,9 @@ function initializeApp() {
     dom.resultsSection = document.getElementById('results-section');
     dom.clearBtn = document.getElementById('clear-btn');
     dom.exportBtn = document.getElementById('export-btn');
-    
+    dom.exportJsonBtn = document.getElementById('export-json-btn');
+    dom.importJsonInput = document.getElementById('import-json-input');
+
     setupEventListeners();
     loadState();
     render();
@@ -45,20 +60,28 @@ function setupEventListeners() {
     dom.itemNameInput.addEventListener('input', updateAddItemButton);
     dom.itemPriceInput.addEventListener('input', updateAddItemButton);
 
-    // Tax and tip
-    dom.taxInput.addEventListener('input', () => {
+    // Tax and tip (with debouncing)
+    const debouncedTaxUpdate = debounce(() => {
         state.tax = parseFloat(dom.taxInput.value) || 0;
         calculateAndRenderSplit();
         saveState();
-    });
-    dom.tipInput.addEventListener('input', () => {
+        syncStateToURL();
+    }, 300);
+
+    const debouncedTipUpdate = debounce(() => {
         state.tip = parseFloat(dom.tipInput.value) || 0;
         calculateAndRenderSplit();
         saveState();
-    });
+        syncStateToURL();
+    }, 300);
+
+    dom.taxInput.addEventListener('input', debouncedTaxUpdate);
+    dom.tipInput.addEventListener('input', debouncedTipUpdate);
 
     // Actions
     dom.exportBtn.addEventListener('click', exportSummaryAsImage);
+    dom.exportJsonBtn.addEventListener('click', exportAsJSON);
+    dom.importJsonInput.addEventListener('change', importFromJSON);
     dom.clearBtn.addEventListener('click', clearState);
 }
 
@@ -94,6 +117,7 @@ function handleAddPerson() {
         render();
         calculateAndRenderSplit();
         saveState();
+        syncStateToURL();
     }
 }
 
@@ -108,6 +132,7 @@ function deletePerson(personId) {
     render();
     calculateAndRenderSplit();
     saveState();
+    syncStateToURL();
 }
 
 function editPersonName(personId) {
@@ -132,6 +157,7 @@ function editPersonName(personId) {
                 state.people[personIndex].name = newName;
                 calculateAndRenderSplit();
                 saveState();
+                syncStateToURL();
             }
         }
         render();
@@ -163,6 +189,7 @@ function handleAddItem() {
         render();
         calculateAndRenderSplit();
         saveState();
+        syncStateToURL();
     } else {
         showToast('Please enter a valid item name and price.', 'error');
     }
@@ -173,6 +200,7 @@ function deleteItem(itemId) {
     render();
     calculateAndRenderSplit();
     saveState();
+    syncStateToURL();
 }
 
 function updatePersonQuantity(itemId, personId, quantity) {
@@ -180,17 +208,18 @@ function updatePersonQuantity(itemId, personId, quantity) {
     if (!item) return;
 
     if (!item.personQuantities) item.personQuantities = {};
-    
+
     const numQuantity = parseFloat(quantity) || 0;
     if (numQuantity > 0) {
         item.personQuantities[personId] = numQuantity;
     } else {
         delete item.personQuantities[personId];
     }
-    
+
     renderItems();
     calculateAndRenderSplit();
     saveState();
+    syncStateToURL();
 }
 
 function splitEvenly(itemId) {
@@ -201,10 +230,11 @@ function splitEvenly(itemId) {
     state.people.forEach(person => {
         item.personQuantities[person.id] = 1; // 1 quantity each
     });
-    
+
     renderItems();
     calculateAndRenderSplit();
     saveState();
+    syncStateToURL();
 }
 
 function clearAllQuantities(itemId) {
@@ -215,6 +245,7 @@ function clearAllQuantities(itemId) {
     renderItems();
     calculateAndRenderSplit();
     saveState();
+    syncStateToURL();
 }
 
 function editItem(itemId) {
@@ -258,6 +289,7 @@ function editItem(itemId) {
         if (hasChanges) {
             calculateAndRenderSplit();
             saveState();
+            syncStateToURL();
         }
         isEditingItem = false;
         render();
@@ -508,11 +540,46 @@ function saveState() {
     }
 }
 
+// --- URL SYNC ---
+function syncStateToURL() {
+    try {
+        const compressed = btoa(encodeURIComponent(JSON.stringify(state)));
+        const url = new URL(window.location);
+        url.searchParams.set('data', compressed);
+        window.history.replaceState({}, '', url);
+    } catch (error) {
+        console.error("Error syncing to URL:", error);
+    }
+}
+
+function loadStateFromURL() {
+    try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const compressed = urlParams.get('data');
+        if (compressed) {
+            const decompressed = JSON.parse(decodeURIComponent(atob(compressed)));
+            return decompressed;
+        }
+    } catch (error) {
+        console.error("Error loading from URL:", error);
+        showToast('Error loading data from URL.', 'error');
+    }
+    return null;
+}
+
 function loadState() {
     try {
-        const saved = localStorage.getItem('lunchSplitterState');
-        if (saved) {
-            const loadedState = JSON.parse(saved);
+        // First try URL params (for sharing), then localStorage
+        let loadedState = loadStateFromURL();
+
+        if (!loadedState) {
+            const saved = localStorage.getItem('lunchSplitterState');
+            if (saved) {
+                loadedState = JSON.parse(saved);
+            }
+        }
+
+        if (loadedState) {
             // Migrate old formats to new format (personQuantities)
             const migratedItems = (loadedState.items || []).map(item => {
                 // Migrate from sharedBy (checkbox format) to personQuantities
@@ -558,7 +625,10 @@ function loadState() {
             // Sync HTML inputs
             dom.taxInput.value = state.tax;
             dom.tipInput.value = state.tip;
-            
+
+            // Sync to URL after loading
+            syncStateToURL();
+
             showToast('Data loaded from previous session.', 'info');
         }
     } catch (error) {
@@ -578,13 +648,16 @@ function clearState() {
             tax: 0,
             tip: 10
         });
-        
+
         dom.personNameInput.value = '';
         dom.itemNameInput.value = '';
         dom.itemPriceInput.value = '';
         dom.taxInput.value = 0;
         dom.tipInput.value = 10;
-        
+
+        // Clear URL params
+        window.history.replaceState({}, '', window.location.pathname);
+
         render();
         showToast('Data cleared successfully!', 'success');
     } catch (error) {
@@ -594,6 +667,73 @@ function clearState() {
 }
 
 // --- EXPORT ---
+function exportAsJSON() {
+    try {
+        const dataStr = JSON.stringify(state, null, 2);
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(dataBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `lunch-splitter-backup-${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        showToast('Data exported as JSON successfully!', 'success');
+    } catch (error) {
+        console.error('Error exporting JSON:', error);
+        showToast('Failed to export data as JSON.', 'error');
+    }
+}
+
+function importFromJSON(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const imported = JSON.parse(e.target.result);
+
+            // Validate the structure
+            if (!imported.people || !imported.items ||
+                typeof imported.nextPersonId !== 'number' ||
+                typeof imported.nextItemId !== 'number') {
+                throw new Error('Invalid data structure');
+            }
+
+            // Merge the imported data into state
+            Object.assign(state, {
+                people: imported.people || [],
+                items: imported.items || [],
+                nextPersonId: imported.nextPersonId || 0,
+                nextItemId: imported.nextItemId || 0,
+                tax: imported.tax !== undefined ? imported.tax : 0,
+                tip: imported.tip !== undefined ? imported.tip : 10
+            });
+
+            // Update UI
+            dom.taxInput.value = state.tax;
+            dom.tipInput.value = state.tip;
+
+            render();
+            saveState();
+            syncStateToURL();
+            showToast('Data imported successfully!', 'success');
+        } catch (error) {
+            console.error('Error importing JSON:', error);
+            showToast('Failed to import data. Please check the file format.', 'error');
+        }
+    };
+    reader.onerror = () => {
+        showToast('Failed to read file.', 'error');
+    };
+    reader.readAsText(file);
+
+    // Reset input so the same file can be imported again
+    event.target.value = '';
+}
+
 async function exportSummaryAsImage() {
     try {
         const cardElement = document.getElementById('results-section');

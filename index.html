@@ -108,11 +108,16 @@
         <!-- Bottom Section -->
         <div class="mt-8">
             <div class="card" id="export-container">
-                <div class="flex justify-between items-center mb-4">
+                <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
                     <h2 class="text-2xl font-semibold">4. The Split</h2>
-                    <div class="flex gap-2">
+                    <div class="flex gap-2 flex-wrap">
                         <button id="export-btn" class="btn bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg" tabindex="8">Export as Image</button>
-                        <button id="clear-btn" class="btn bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg" tabindex="9">Clear Data</button>
+                        <button id="export-json-btn" class="btn bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg" tabindex="9">Export as JSON</button>
+                        <label for="import-json-input" class="btn bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg cursor-pointer" tabindex="10">
+                            Import JSON
+                            <input type="file" id="import-json-input" accept=".json" class="hidden">
+                        </label>
+                        <button id="clear-btn" class="btn bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg" tabindex="11">Clear Data</button>
                     </div>
                 </div>
                 <div id="results-section">
