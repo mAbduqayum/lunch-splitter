@@ -36,6 +36,13 @@ function setupEventListeners() {
     // Person management
     dom.addPersonBtn.addEventListener('click', handleAddPerson);
     dom.personNameInput.addEventListener('keypress', (e) => e.key === 'Enter' && handleAddPerson());
+    dom.personNameInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Tab' && !dom.personNameInput.value.trim()) {
+            e.preventDefault();
+            // Focus on item-name input when username is empty
+            dom.itemNameInput.focus();
+        }
+    });
     dom.personNameInput.addEventListener('input', updateAddPersonButton);
 
     // Item management
