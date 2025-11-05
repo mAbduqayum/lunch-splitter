@@ -17,6 +17,8 @@ body {
     font-weight: 500;
     cursor: pointer;
     transition: background-color 0.3s, box-shadow 0.3s;
+    min-height: 44px;
+    min-width: 44px;
 }
 .btn-primary {
     background-color: #4f46e5;
@@ -48,6 +50,8 @@ body {
     border: 1px solid #d1d5db;
     border-radius: 0.5rem;
     transition: border-color 0.3s, box-shadow 0.3s;
+    min-height: 44px;
+    box-sizing: border-box;
 }
 .input-field:focus {
     outline: none;
