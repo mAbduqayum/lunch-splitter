@@ -41,6 +41,7 @@ function initializeApp() {
     dom.exportBtn = document.getElementById('export-btn');
     dom.exportJsonBtn = document.getElementById('export-json-btn');
     dom.importJsonInput = document.getElementById('import-json-input');
+    dom.shareLinkBtn = document.getElementById('share-link-btn');
 
     setupEventListeners();
     loadState();
@@ -65,20 +66,19 @@ function setupEventListeners() {
         state.tax = parseFloat(dom.taxInput.value) || 0;
         calculateAndRenderSplit();
         saveState();
-        syncStateToURL();
     }, 300);
 
     const debouncedTipUpdate = debounce(() => {
         state.tip = parseFloat(dom.tipInput.value) || 0;
         calculateAndRenderSplit();
         saveState();
-        syncStateToURL();
     }, 300);
 
     dom.taxInput.addEventListener('input', debouncedTaxUpdate);
     dom.tipInput.addEventListener('input', debouncedTipUpdate);
 
     // Actions
+    dom.shareLinkBtn.addEventListener('click', copyShareLink);
     dom.exportBtn.addEventListener('click', exportSummaryAsImage);
     dom.exportJsonBtn.addEventListener('click', exportAsJSON);
     dom.importJsonInput.addEventListener('change', importFromJSON);
@@ -117,7 +117,6 @@ function handleAddPerson() {
         render();
         calculateAndRenderSplit();
         saveState();
-        syncStateToURL();
     }
 }
 
@@ -132,7 +131,6 @@ function deletePerson(personId) {
     render();
     calculateAndRenderSplit();
     saveState();
-    syncStateToURL();
 }
 
 function editPersonName(personId) {
@@ -157,7 +155,6 @@ function editPersonName(personId) {
                 state.people[personIndex].name = newName;
                 calculateAndRenderSplit();
                 saveState();
-                syncStateToURL();
             }
         }
         render();
@@ -189,7 +186,6 @@ function handleAddItem() {
         render();
         calculateAndRenderSplit();
         saveState();
-        syncStateToURL();
     } else {
         showToast('Please enter a valid item name and price.', 'error');
     }
@@ -200,7 +196,6 @@ function deleteItem(itemId) {
     render();
     calculateAndRenderSplit();
     saveState();
-    syncStateToURL();
 }
 
 function updatePersonQuantity(itemId, personId, quantity) {
@@ -219,7 +214,6 @@ function updatePersonQuantity(itemId, personId, quantity) {
     renderItems();
     calculateAndRenderSplit();
     saveState();
-    syncStateToURL();
 }
 
 function splitEvenly(itemId) {
@@ -234,7 +228,6 @@ function splitEvenly(itemId) {
     renderItems();
     calculateAndRenderSplit();
     saveState();
-    syncStateToURL();
 }
 
 function clearAllQuantities(itemId) {
@@ -245,7 +238,6 @@ function clearAllQuantities(itemId) {
     renderItems();
     calculateAndRenderSplit();
     saveState();
-    syncStateToURL();
 }
 
 function editItem(itemId) {
@@ -289,7 +281,6 @@ function editItem(itemId) {
         if (hasChanges) {
             calculateAndRenderSplit();
             saveState();
-            syncStateToURL();
         }
         isEditingItem = false;
         render();
@@ -540,16 +531,40 @@ function saveState() {
     }
 }
 
-// --- URL SYNC ---
-function syncStateToURL() {
+// --- URL SHARING ---
+function generateShareableURL() {
     try {
         const compressed = btoa(encodeURIComponent(JSON.stringify(state)));
-        const url = new URL(window.location);
+        const url = new URL(window.location.origin + window.location.pathname);
         url.searchParams.set('data', compressed);
-        window.history.replaceState({}, '', url);
+        return url.toString();
     } catch (error) {
-        console.error("Error syncing to URL:", error);
+        console.error("Error generating shareable URL:", error);
+        return null;
     }
+}
+
+function copyShareLink() {
+    if (state.people.length === 0 && state.items.length === 0) {
+        showToast('Please add people and items first before sharing.', 'error');
+        return;
+    }
+
+    const shareURL = generateShareableURL();
+    if (!shareURL) {
+        showToast('Failed to generate share link.', 'error');
+        return;
+    }
+
+    navigator.clipboard.writeText(shareURL)
+        .then(() => {
+            showToast('Share link copied to clipboard!', 'success');
+        })
+        .catch((error) => {
+            console.error('Failed to copy link:', error);
+            // Fallback: show the URL in a prompt
+            prompt('Copy this link to share:', shareURL);
+        });
 }
 
 function loadStateFromURL() {
@@ -571,6 +586,7 @@ function loadState() {
     try {
         // First try URL params (for sharing), then localStorage
         let loadedState = loadStateFromURL();
+        const fromURL = !!loadedState;
 
         if (!loadedState) {
             const saved = localStorage.getItem('lunchSplitterState');
@@ -626,10 +642,13 @@ function loadState() {
             dom.taxInput.value = state.tax;
             dom.tipInput.value = state.tip;
 
-            // Sync to URL after loading
-            syncStateToURL();
-
-            showToast('Data loaded from previous session.', 'info');
+            // Clear URL params if loaded from URL to keep URL clean
+            if (fromURL) {
+                window.history.replaceState({}, '', window.location.pathname);
+                showToast('Bill loaded from shared link!', 'success');
+            } else {
+                showToast('Data loaded from previous session.', 'info');
+            }
         }
     } catch (error) {
         console.error("Error loading state:", error);
@@ -718,7 +737,6 @@ function importFromJSON(event) {
 
             render();
             saveState();
-            syncStateToURL();
             showToast('Data imported successfully!', 'success');
         } catch (error) {
             console.error('Error importing JSON:', error);
