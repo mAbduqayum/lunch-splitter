@@ -36,26 +36,12 @@ function setupEventListeners() {
     // Person management
     dom.addPersonBtn.addEventListener('click', handleAddPerson);
     dom.personNameInput.addEventListener('keypress', (e) => e.key === 'Enter' && handleAddPerson());
-    dom.personNameInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Tab' && !dom.personNameInput.value.trim()) {
-            e.preventDefault();
-            // Focus on item-name input when username is empty
-            dom.itemNameInput.focus();
-        }
-    });
     dom.personNameInput.addEventListener('input', updateAddPersonButton);
 
     // Item management
     dom.addItemBtn.addEventListener('click', handleAddItem);
     dom.itemNameInput.addEventListener('keypress', (e) => e.key === 'Enter' && handleAddItem());
     dom.itemPriceInput.addEventListener('keypress', (e) => e.key === 'Enter' && handleAddItem());
-    dom.itemNameInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Tab' && e.shiftKey && !dom.itemNameInput.value.trim()) {
-            e.preventDefault();
-            // Focus on person-name input when shift+tabbing and item name is empty
-            dom.personNameInput.focus();
-        }
-    });
     dom.itemNameInput.addEventListener('input', updateAddItemButton);
     dom.itemPriceInput.addEventListener('input', updateAddItemButton);
 
