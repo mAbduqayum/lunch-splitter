@@ -216,3 +216,46 @@ tbody tr.summary-row td.total-col {
     z-index: 3;
     background-color: white;
 }
+
+/* Disable freeze functionality on mobile devices */
+@media (max-width: 768px) {
+    /* Remove sticky positioning from header */
+    thead th {
+        position: relative;
+        z-index: auto;
+    }
+
+    /* Remove sticky positioning from first column */
+    tbody td:first-child,
+    tbody th:first-child,
+    thead th:first-child {
+        position: relative;
+        left: auto;
+        z-index: auto;
+    }
+
+    /* Remove sticky positioning from total columns */
+    th.total-col,
+    td.total-col,
+    th.total-col-1, td.total-col-1,
+    th.total-col-2, td.total-col-2,
+    th.total-col-3, td.total-col-3,
+    th.total-col-4, td.total-col-4 {
+        position: relative;
+        right: auto;
+        z-index: auto;
+    }
+
+    /* Remove sticky positioning from summary rows */
+    tbody tr.summary-row {
+        position: relative;
+        bottom: auto;
+        z-index: auto;
+    }
+
+    /* Remove max-height constraint on mobile */
+    .overflow-x-auto {
+        max-height: none;
+        overflow-y: visible;
+    }
+}
