@@ -482,6 +482,35 @@ function calculateAndRenderSplit() {
             `;
         });
 
+        // Item totals row
+        tableHTML += `
+            <tr class="border-t-2 border-gray-400 summary-row">
+                <td class="py-2 px-4 font-semibold">Item Total</td>
+                ${state.items.map(item => {
+                    let itemTotal = 0;
+                    const totalQuantities = Object.values(item.personQuantities || {}).reduce((sum, qty) => {
+                        const numQty = parseFloat(qty) || 0;
+                        return sum + numQty;
+                    }, 0);
+                    const pricePerUnit = totalQuantities > 0 ? item.price / totalQuantities : 0;
+
+                    personTotals.forEach(person => {
+                        const personQuantity = item.personQuantities?.[person.id];
+                        const numPersonQuantity = parseFloat(personQuantity) || 0;
+                        if (numPersonQuantity > 0) {
+                            itemTotal += numPersonQuantity * pricePerUnit;
+                        }
+                    });
+
+                    return `<td class="py-2 px-4 text-center font-semibold">${itemTotal.toFixed(2)}</td>`;
+                }).join('')}
+                <td class="py-2 px-4 text-center border-l-2 border-gray-400 font-semibold">${totalBillSubtotal.toFixed(2)}</td>
+                <td class="py-2 px-4 text-center"></td>
+                <td class="py-2 px-4 text-center"></td>
+                <td class="py-2 px-4 text-center"></td>
+            </tr>
+        `;
+
         tableHTML += '</tbody></table></div>';
     } else {
         // Original view: Items as rows, People as columns
@@ -492,6 +521,7 @@ function calculateAndRenderSplit() {
                         <tr class="border-b">
                             <th class="py-2 px-4">Item</th>
                             ${personTotals.map(person => `<th class="py-2 px-4 text-center">${person.name}</th>`).join('')}
+                            <th class="py-2 px-4 text-center border-l-2 border-gray-400">Item Total</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -505,6 +535,7 @@ function calculateAndRenderSplit() {
             }, 0);
             const pricePerUnit = totalQuantities > 0 ? item.price / totalQuantities : 0;
 
+            let itemTotal = 0;
             tableHTML += `
                 <tr class="border-b">
                     <td class="py-2 px-4 font-medium">${item.name}<br><span class="text-sm text-gray-600">($${item.price.toFixed(2)})</span></td>
@@ -513,10 +544,12 @@ function calculateAndRenderSplit() {
                         const numPersonQuantity = parseFloat(personQuantity) || 0;
                         if (personQuantity && numPersonQuantity > 0) {
                             const personAmount = numPersonQuantity * pricePerUnit;
+                            itemTotal += personAmount;
                             return `<td class="py-2 px-4 text-center">${numPersonQuantity}× = ${personAmount.toFixed(2)}</td>`;
                         }
                         return '<td class="py-2 px-4 text-center">-</td>';
                     }).join('')}
+                    <td class="py-2 px-4 text-center border-l-2 border-gray-400 font-semibold">${itemTotal.toFixed(2)}</td>
                 </tr>
             `;
         });
@@ -530,6 +563,7 @@ function calculateAndRenderSplit() {
 
             tableHTML += `<tr class="${borderClass}"><td class="py-2 px-4 font-semibold">${summaryType}</td>`;
 
+            let rowTotal = 0;
             personTotals.forEach(person => {
                 const personTax = person.subtotal * taxRate;
                 const personTip = person.subtotal * tipRate;
@@ -545,10 +579,14 @@ function calculateAndRenderSplit() {
                         grandTotal += personTotal;
                         break;
                 }
+                rowTotal += value;
 
                 const cellClass = isTotal ? 'font-bold' : '';
                 tableHTML += `<td class="py-2 px-4 text-center ${cellClass}">${value.toFixed(2)}</td>`;
             });
+
+            const cellClass = isTotal ? 'font-bold' : '';
+            tableHTML += `<td class="py-2 px-4 text-center border-l-2 border-gray-400 ${cellClass}">${rowTotal.toFixed(2)}</td>`;
             tableHTML += '</tr>';
         });
 
@@ -741,15 +779,35 @@ function loadStateFromURL() {
 
 function loadState() {
     try {
-        // First try URL params (for sharing), then localStorage
-        let loadedState = loadStateFromURL();
-        const fromURL = !!loadedState;
+        // Check both URL and localStorage
+        const urlState = loadStateFromURL();
+        const saved = localStorage.getItem('lunchSplitterState');
+        const localStorageState = saved ? JSON.parse(saved) : null;
 
-        if (!loadedState) {
-            const saved = localStorage.getItem('lunchSplitterState');
-            if (saved) {
-                loadedState = JSON.parse(saved);
+        let loadedState = null;
+        let fromURL = false;
+
+        // If both exist, ask user which to use
+        if (urlState && localStorageState) {
+            const useURLData = confirm(
+                'You have both shared link data and saved data.\n\n' +
+                'Click OK to load data from the shared link (this will overwrite your saved data).\n' +
+                'Click Cancel to keep your current saved data.'
+            );
+
+            if (useURLData) {
+                loadedState = urlState;
+                fromURL = true;
+            } else {
+                loadedState = localStorageState;
+                // Clear URL params since user chose to keep localStorage
+                window.history.replaceState({}, '', window.location.pathname);
             }
+        } else if (urlState) {
+            loadedState = urlState;
+            fromURL = true;
+        } else if (localStorageState) {
+            loadedState = localStorageState;
         }
 
         if (loadedState) {
