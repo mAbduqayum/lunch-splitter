@@ -6,7 +6,8 @@ const state = {
     nextItemId: 0,
     tax: 0,
     tip: 10,
-    isTransposed: false
+    isTransposed: false,
+    undoStack: [] // Stack for undo operations: {type: 'person'|'item', data: {...}}
 };
 
 // --- UTILITIES ---
@@ -42,8 +43,10 @@ function initializeApp() {
     dom.exportBtn = document.getElementById('export-btn');
     dom.exportJsonBtn = document.getElementById('export-json-btn');
     dom.importJsonInput = document.getElementById('import-json-input');
+    dom.importJsonBtn = document.getElementById('import-json-btn');
     dom.shareLinkBtn = document.getElementById('share-link-btn');
     dom.transposeBtn = document.getElementById('transpose-btn');
+    dom.undoBtn = document.getElementById('undo-btn');
 
     setupEventListeners();
     loadState();
@@ -83,9 +86,10 @@ function setupEventListeners() {
     dom.transposeBtn.addEventListener('click', toggleTranspose);
     dom.shareLinkBtn.addEventListener('click', copyShareLink);
     dom.exportBtn.addEventListener('click', exportSummaryAsImage);
-    dom.exportJsonBtn.addEventListener('click', exportAsJSON);
-    dom.importJsonInput.addEventListener('change', importFromJSON);
+    dom.exportJsonBtn.addEventListener('click', showExportJSONModal);
+    dom.importJsonBtn.addEventListener('click', showImportJSONModal);
     dom.clearBtn.addEventListener('click', clearState);
+    dom.undoBtn.addEventListener('click', performUndo);
 }
 
 // --- UNIFIED RENDER FUNCTION ---
@@ -95,6 +99,7 @@ function render() {
     calculateAndRenderSplit();
     updateAddPersonButton();
     updateAddItemButton();
+    updateUndoButton();
 }
 
 function updateAddPersonButton() {
@@ -105,6 +110,49 @@ function updateAddItemButton() {
     const hasName = dom.itemNameInput.value.trim();
     const hasValidPrice = dom.itemPriceInput.value.trim() && parseFloat(dom.itemPriceInput.value) > 0;
     dom.addItemBtn.disabled = !hasName || !hasValidPrice;
+}
+
+function updateUndoButton() {
+    if (dom.undoBtn) {
+        dom.undoBtn.disabled = state.undoStack.length === 0;
+        const lastAction = state.undoStack[state.undoStack.length - 1];
+        if (lastAction) {
+            const actionText = lastAction.type === 'person' ?
+                `Undo Remove "${lastAction.data.name}"` :
+                `Undo Remove "${lastAction.data.name}"`;
+            dom.undoBtn.textContent = actionText;
+        } else {
+            dom.undoBtn.textContent = 'Undo';
+        }
+    }
+}
+
+function performUndo() {
+    if (state.undoStack.length === 0) return;
+
+    const action = state.undoStack.pop();
+
+    if (action.type === 'person') {
+        // Restore person
+        state.people.push(action.data.person);
+        // Restore their quantities in items
+        action.data.itemQuantities.forEach(({ itemId, quantity }) => {
+            const item = state.items.find(i => i.id === itemId);
+            if (item) {
+                if (!item.personQuantities) item.personQuantities = {};
+                item.personQuantities[action.data.person.id] = quantity;
+            }
+        });
+        showToast(`Restored person: ${action.data.person.name}`, 'success');
+    } else if (action.type === 'item') {
+        // Restore item
+        state.items.push(action.data);
+        showToast(`Restored item: ${action.data.name}`, 'success');
+    }
+
+    render();
+    calculateAndRenderSplit();
+    saveState();
 }
 
 // --- PERSON MANAGEMENT ---
@@ -124,6 +172,28 @@ function handleAddPerson() {
 }
 
 function deletePerson(personId) {
+    const person = state.people.find(p => p.id === personId);
+    if (!person) return;
+
+    // Save person and their quantities for undo
+    const itemQuantities = [];
+    state.items.forEach(item => {
+        if (item.personQuantities && item.personQuantities[personId]) {
+            itemQuantities.push({
+                itemId: item.id,
+                quantity: item.personQuantities[personId]
+            });
+        }
+    });
+
+    state.undoStack.push({
+        type: 'person',
+        data: {
+            person: { ...person },
+            itemQuantities
+        }
+    });
+
     state.people = state.people.filter(p => p.id !== personId);
     state.items = state.items.map(item => ({
         ...item,
@@ -195,6 +265,15 @@ function handleAddItem() {
 }
 
 function deleteItem(itemId) {
+    const item = state.items.find(i => i.id === itemId);
+    if (!item) return;
+
+    // Save item for undo
+    state.undoStack.push({
+        type: 'item',
+        data: { ...item }
+    });
+
     state.items = state.items.filter(i => i.id !== itemId);
     render();
     calculateAndRenderSplit();
@@ -851,7 +930,8 @@ function loadState() {
                 nextItemId: loadedState.nextItemId || 0,
                 tax: loadedState.tax !== undefined ? loadedState.tax : 0,
                 tip: loadedState.tip !== undefined ? loadedState.tip : 10,
-                isTransposed: loadedState.isTransposed || false
+                isTransposed: loadedState.isTransposed || false,
+                undoStack: fromURL ? [] : (loadedState.undoStack || []) // Reset undo stack if from URL
             });
             
             // Sync HTML inputs
@@ -882,7 +962,8 @@ function clearState() {
             nextItemId: 0,
             tax: 0,
             tip: 10,
-            isTransposed: false
+            isTransposed: false,
+            undoStack: []
         });
 
         dom.personNameInput.value = '';
@@ -902,34 +983,115 @@ function clearState() {
     }
 }
 
-// --- EXPORT ---
-function exportAsJSON() {
+// --- MODAL UTILITIES ---
+function createModal(title, content, onClose) {
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+    modal.innerHTML = `
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center p-6 border-b">
+                <h3 class="text-xl font-bold">${title}</h3>
+                <button class="text-gray-500 hover:text-gray-700 text-2xl" onclick="this.closest('.fixed').remove()">×</button>
+            </div>
+            <div class="p-6 overflow-auto flex-1">
+                ${content}
+            </div>
+        </div>
+    `;
+
+    // Close on background click
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.remove();
+            if (onClose) onClose();
+        }
+    });
+
+    document.body.appendChild(modal);
+    return modal;
+}
+
+// --- JSON IMPORT/EXPORT WITH POPUP ---
+function showExportJSONModal() {
     try {
         const dataStr = JSON.stringify(state, null, 2);
-        const dataBlob = new Blob([dataStr], { type: 'application/json' });
-        const url = URL.createObjectURL(dataBlob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `lunch-splitter-backup-${new Date().toISOString().slice(0, 10)}.json`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        showToast('Data exported as JSON successfully!', 'success');
+        const content = `
+            <p class="mb-4 text-gray-600">Copy the JSON below to save your data:</p>
+            <textarea id="export-json-textarea" class="w-full h-96 p-3 border rounded-lg font-mono text-sm" readonly>${dataStr}</textarea>
+            <div class="mt-4 flex gap-2 justify-end">
+                <button id="copy-json-btn" class="btn bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">Copy to Clipboard</button>
+                <button id="download-json-btn" class="btn bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg">Download File</button>
+            </div>
+        `;
+
+        const modal = createModal('Export JSON', content);
+
+        // Auto-select text
+        const textarea = modal.querySelector('#export-json-textarea');
+        textarea.focus();
+        textarea.select();
+
+        // Copy button
+        modal.querySelector('#copy-json-btn').addEventListener('click', () => {
+            textarea.select();
+            navigator.clipboard.writeText(dataStr)
+                .then(() => {
+                    showToast('JSON copied to clipboard!', 'success');
+                })
+                .catch(() => {
+                    showToast('Failed to copy to clipboard.', 'error');
+                });
+        });
+
+        // Download button
+        modal.querySelector('#download-json-btn').addEventListener('click', () => {
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `lunch-splitter-backup-${new Date().toISOString().slice(0, 10)}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            showToast('JSON file downloaded!', 'success');
+        });
     } catch (error) {
         console.error('Error exporting JSON:', error);
         showToast('Failed to export data as JSON.', 'error');
     }
 }
 
-function importFromJSON(event) {
-    const file = event.target.files[0];
-    if (!file) return;
+function showImportJSONModal() {
+    const content = `
+        <p class="mb-4 text-gray-600">Paste your JSON data below to import:</p>
+        <textarea id="import-json-textarea" class="w-full h-96 p-3 border rounded-lg font-mono text-sm" placeholder="Paste JSON here..."></textarea>
+        <div class="mt-4 flex gap-2 justify-end">
+            <button id="cancel-import-btn" class="btn bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">Cancel</button>
+            <button id="import-json-btn-modal" class="btn bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">Import</button>
+        </div>
+    `;
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
+    const modal = createModal('Import JSON', content);
+
+    const textarea = modal.querySelector('#import-json-textarea');
+    textarea.focus();
+
+    // Cancel button
+    modal.querySelector('#cancel-import-btn').addEventListener('click', () => {
+        modal.remove();
+    });
+
+    // Import button
+    modal.querySelector('#import-json-btn-modal').addEventListener('click', () => {
         try {
-            const imported = JSON.parse(e.target.result);
+            const jsonText = textarea.value.trim();
+            if (!jsonText) {
+                showToast('Please paste JSON data first.', 'error');
+                return;
+            }
+
+            const imported = JSON.parse(jsonText);
 
             // Validate the structure
             if (!imported.people || !imported.items ||
@@ -945,7 +1107,9 @@ function importFromJSON(event) {
                 nextPersonId: imported.nextPersonId || 0,
                 nextItemId: imported.nextItemId || 0,
                 tax: imported.tax !== undefined ? imported.tax : 0,
-                tip: imported.tip !== undefined ? imported.tip : 10
+                tip: imported.tip !== undefined ? imported.tip : 10,
+                isTransposed: imported.isTransposed || false,
+                undoStack: [] // Reset undo stack on import
             });
 
             // Update UI
@@ -955,18 +1119,12 @@ function importFromJSON(event) {
             render();
             saveState();
             showToast('Data imported successfully!', 'success');
+            modal.remove();
         } catch (error) {
             console.error('Error importing JSON:', error);
-            showToast('Failed to import data. Please check the file format.', 'error');
+            showToast('Failed to import data. Please check the JSON format.', 'error');
         }
-    };
-    reader.onerror = () => {
-        showToast('Failed to read file.', 'error');
-    };
-    reader.readAsText(file);
-
-    // Reset input so the same file can be imported again
-    event.target.value = '';
+    });
 }
 
 async function exportSummaryAsImage() {
