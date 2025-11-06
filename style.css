@@ -84,39 +84,42 @@ tbody tr:nth-child(even):not(.summary-row) {
     position: relative;
 }
 
-/* Freeze header row */
-thead th {
-    position: sticky;
-    top: 0;
-    z-index: 3;
-    background-color: #f3f4f6;
-}
+/* Freeze functionality - only enabled on desktop devices (tablets and larger) */
+@media (min-width: 768px) {
+    /* Freeze header row */
+    thead th {
+        position: sticky;
+        top: 0;
+        z-index: 3;
+        background-color: #f3f4f6;
+    }
 
-/* Freeze first column in tbody */
-tbody td:first-child,
-tbody th:first-child {
-    position: sticky;
-    left: 0;
-    z-index: 2;
-    background-color: white;
-}
+    /* Freeze first column in tbody */
+    tbody td:first-child,
+    tbody th:first-child {
+        position: sticky;
+        left: 0;
+        z-index: 2;
+        background-color: white;
+    }
 
-/* Freeze first column in thead */
-thead th:first-child {
-    position: sticky;
-    left: 0;
-    z-index: 4;
-    background-color: #f3f4f6;
-}
+    /* Freeze first column in thead */
+    thead th:first-child {
+        position: sticky;
+        left: 0;
+        z-index: 4;
+        background-color: #f3f4f6;
+    }
 
-/* Alternate row colors for frozen first column */
-tbody tr:nth-child(even):not(.summary-row) td:first-child,
-tbody tr:nth-child(even):not(.summary-row) th:first-child {
-    background-color: #f9fafb;
-}
+    /* Alternate row colors for frozen first column */
+    tbody tr:nth-child(even):not(.summary-row) td:first-child,
+    tbody tr:nth-child(even):not(.summary-row) th:first-child {
+        background-color: #f9fafb;
+    }
 
-/* Summary rows frozen first column */
-tbody tr.summary-row td:first-child,
-tbody tr.summary-row th:first-child {
-    background-color: white;
+    /* Summary rows frozen first column */
+    tbody tr.summary-row td:first-child,
+    tbody tr.summary-row th:first-child {
+        background-color: white;
+    }
 }
