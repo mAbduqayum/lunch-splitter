@@ -47,6 +47,7 @@ function initializeApp() {
     dom.shareLinkBtn = document.getElementById('share-link-btn');
     dom.transposeBtn = document.getElementById('transpose-btn');
     dom.undoBtn = document.getElementById('undo-btn');
+    dom.shuffleBtn = document.getElementById('shuffle-btn');
 
     setupEventListeners();
     loadState();
@@ -84,6 +85,7 @@ function setupEventListeners() {
 
     // Actions
     dom.transposeBtn.addEventListener('click', toggleTranspose);
+    dom.shuffleBtn.addEventListener('click', shuffleQuantities);
     dom.shareLinkBtn.addEventListener('click', copyShareLink);
     dom.exportBtn.addEventListener('click', exportSummaryAsImage);
     dom.exportJsonBtn.addEventListener('click', showExportJSONModal);
@@ -320,6 +322,63 @@ function clearAllQuantities(itemId) {
     renderItems();
     calculateAndRenderSplit();
     saveState();
+}
+
+function shuffleQuantities() {
+    if (state.people.length === 0 || state.items.length === 0) {
+        showToast('Please add people and items before shuffling.', 'error');
+        return;
+    }
+
+    // For each item, redistribute the total quantities randomly among people
+    state.items.forEach(item => {
+        // Calculate total quantities for this item
+        const totalQuantity = Object.values(item.personQuantities || {}).reduce((sum, qty) => {
+            const numQty = parseFloat(qty) || 0;
+            return sum + numQty;
+        }, 0);
+
+        // If there are no quantities assigned, skip this item
+        if (totalQuantity === 0) return;
+
+        // Generate random quantities for each person
+        const randomQuantities = [];
+        let remainingQuantity = totalQuantity;
+
+        // Generate random values for all but the last person
+        for (let i = 0; i < state.people.length - 1; i++) {
+            // Use a random value between 0 and the remaining quantity
+            const maxQuantity = remainingQuantity;
+            const randomQty = Math.random() * maxQuantity;
+            randomQuantities.push(randomQty);
+            remainingQuantity -= randomQty;
+        }
+
+        // Assign the remaining quantity to the last person
+        randomQuantities.push(remainingQuantity);
+
+        // Shuffle the array to make it truly random (Fisher-Yates shuffle)
+        for (let i = randomQuantities.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [randomQuantities[i], randomQuantities[j]] = [randomQuantities[j], randomQuantities[i]];
+        }
+
+        // Assign the shuffled quantities to people
+        item.personQuantities = {};
+        state.people.forEach((person, index) => {
+            const qty = randomQuantities[index];
+            // Only assign if quantity is greater than a small threshold
+            if (qty > 0.01) {
+                // Round to 2 decimal places for cleaner display
+                item.personQuantities[person.id] = Math.round(qty * 100) / 100;
+            }
+        });
+    });
+
+    render();
+    calculateAndRenderSplit();
+    saveState();
+    showToast('Quantities shuffled randomly!', 'success');
 }
 
 function editItem(itemId) {
