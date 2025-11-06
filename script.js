@@ -521,10 +521,10 @@ function calculateAndRenderSplit() {
                         <tr class="border-b">
                             <th class="py-2 px-4">Person</th>
                             ${state.items.map(item => `<th class="py-2 px-4 text-center">${item.name}<br><span class="text-xs text-gray-600">($${item.price.toFixed(2)})</span></th>`).join('')}
-                            <th class="py-2 px-4 text-center border-l-2 border-gray-400">Subtotal</th>
-                            <th class="py-2 px-4 text-center">Tax</th>
-                            <th class="py-2 px-4 text-center">Tip</th>
-                            <th class="py-2 px-4 text-center">Total</th>
+                            <th class="py-2 px-4 text-center border-l-2 border-gray-400 total-col total-col-1">Subtotal</th>
+                            <th class="py-2 px-4 text-center total-col total-col-2">Tax</th>
+                            <th class="py-2 px-4 text-center total-col total-col-3">Tip</th>
+                            <th class="py-2 px-4 text-center total-col total-col-4">Total</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -553,10 +553,10 @@ function calculateAndRenderSplit() {
                         }
                         return '<td class="py-2 px-4 text-center">-</td>';
                     }).join('')}
-                    <td class="py-2 px-4 text-center border-l-2 border-gray-400">${person.subtotal.toFixed(2)}</td>
-                    <td class="py-2 px-4 text-center">${personTax.toFixed(2)}</td>
-                    <td class="py-2 px-4 text-center">${personTip.toFixed(2)}</td>
-                    <td class="py-2 px-4 text-center font-bold">${personTotal.toFixed(2)}</td>
+                    <td class="py-2 px-4 text-center border-l-2 border-gray-400 total-col total-col-1">${person.subtotal.toFixed(2)}</td>
+                    <td class="py-2 px-4 text-center total-col total-col-2">${personTax.toFixed(2)}</td>
+                    <td class="py-2 px-4 text-center total-col total-col-3">${personTip.toFixed(2)}</td>
+                    <td class="py-2 px-4 text-center font-bold total-col total-col-4">${personTotal.toFixed(2)}</td>
                 </tr>
             `;
         });
@@ -583,10 +583,10 @@ function calculateAndRenderSplit() {
 
                     return `<td class="py-2 px-4 text-center font-semibold">${itemTotal.toFixed(2)}</td>`;
                 }).join('')}
-                <td class="py-2 px-4 text-center border-l-2 border-gray-400 font-semibold">${totalBillSubtotal.toFixed(2)}</td>
-                <td class="py-2 px-4 text-center"></td>
-                <td class="py-2 px-4 text-center"></td>
-                <td class="py-2 px-4 text-center"></td>
+                <td class="py-2 px-4 text-center border-l-2 border-gray-400 font-semibold total-col total-col-1">${totalBillSubtotal.toFixed(2)}</td>
+                <td class="py-2 px-4 text-center total-col total-col-2"></td>
+                <td class="py-2 px-4 text-center total-col total-col-3"></td>
+                <td class="py-2 px-4 text-center total-col total-col-4"></td>
             </tr>
         `;
 
@@ -600,7 +600,7 @@ function calculateAndRenderSplit() {
                         <tr class="border-b">
                             <th class="py-2 px-4">Item</th>
                             ${personTotals.map(person => `<th class="py-2 px-4 text-center">${person.name}</th>`).join('')}
-                            <th class="py-2 px-4 text-center border-l-2 border-gray-400">Item Total</th>
+                            <th class="py-2 px-4 text-center border-l-2 border-gray-400 total-col">Item Total</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -628,7 +628,7 @@ function calculateAndRenderSplit() {
                         }
                         return '<td class="py-2 px-4 text-center">-</td>';
                     }).join('')}
-                    <td class="py-2 px-4 text-center border-l-2 border-gray-400 font-semibold">${itemTotal.toFixed(2)}</td>
+                    <td class="py-2 px-4 text-center border-l-2 border-gray-400 font-semibold total-col">${itemTotal.toFixed(2)}</td>
                 </tr>
             `;
         });
@@ -665,7 +665,7 @@ function calculateAndRenderSplit() {
             });
 
             const cellClass = isTotal ? 'font-bold' : '';
-            tableHTML += `<td class="py-2 px-4 text-center border-l-2 border-gray-400 ${cellClass}">${rowTotal.toFixed(2)}</td>`;
+            tableHTML += `<td class="py-2 px-4 text-center border-l-2 border-gray-400 total-col ${cellClass}">${rowTotal.toFixed(2)}</td>`;
             tableHTML += '</tr>';
         });
 
