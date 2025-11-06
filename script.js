@@ -5,7 +5,8 @@ const state = {
     nextPersonId: 0,
     nextItemId: 0,
     tax: 0,
-    tip: 10
+    tip: 10,
+    isTransposed: false
 };
 
 // --- UTILITIES ---
@@ -42,6 +43,7 @@ function initializeApp() {
     dom.exportJsonBtn = document.getElementById('export-json-btn');
     dom.importJsonInput = document.getElementById('import-json-input');
     dom.shareLinkBtn = document.getElementById('share-link-btn');
+    dom.transposeBtn = document.getElementById('transpose-btn');
 
     setupEventListeners();
     loadState();
@@ -78,6 +80,7 @@ function setupEventListeners() {
     dom.tipInput.addEventListener('input', debouncedTipUpdate);
 
     // Actions
+    dom.transposeBtn.addEventListener('click', toggleTranspose);
     dom.shareLinkBtn.addEventListener('click', copyShareLink);
     dom.exportBtn.addEventListener('click', exportSummaryAsImage);
     dom.exportJsonBtn.addEventListener('click', exportAsJSON);
@@ -389,6 +392,12 @@ function renderItems() {
     }).join('');
 }
 
+function toggleTranspose() {
+    state.isTransposed = !state.isTransposed;
+    calculateAndRenderSplit();
+    saveState();
+}
+
 function calculateAndRenderSplit() {
     if (state.people.length === 0) {
         dom.resultsSection.innerHTML = '<p class="text-center text-gray-500">Add people and items to see the breakdown.</p>';
@@ -422,80 +431,140 @@ function calculateAndRenderSplit() {
         totalBillSubtotal += item.price;
     });
 
-    // Build table HTML
-    let tableHTML = `
-        <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse min-w-max">
-                <thead>
-                    <tr class="border-b">
-                        <th class="py-2 px-4">Item</th>
-                        ${personTotals.map(person => `<th class="py-2 px-4 text-center">${person.name}</th>`).join('')}
-                    </tr>
-                </thead>
-                <tbody>
-    `;
+    let tableHTML;
 
-    // Item rows
-    state.items.forEach(item => {
-        const totalQuantities = Object.values(item.personQuantities || {}).reduce((sum, qty) => {
-            const numQty = parseFloat(qty) || 0;
-            return sum + numQty;
-        }, 0);
-        const pricePerUnit = totalQuantities > 0 ? item.price / totalQuantities : 0;
-        
-        tableHTML += `
-            <tr class="border-b">
-                <td class="py-2 px-4 font-medium">${item.name}<br><span class="text-sm text-gray-600">($${item.price.toFixed(2)})</span></td>
-                ${personTotals.map(person => {
-                    const personQuantity = item.personQuantities?.[person.id];
-                    const numPersonQuantity = parseFloat(personQuantity) || 0;
-                    if (personQuantity && numPersonQuantity > 0) {
-                        const personAmount = numPersonQuantity * pricePerUnit;
-                        return `<td class="py-2 px-4 text-center">${numPersonQuantity}× = ${personAmount.toFixed(2)}</td>`;
-                    }
-                    return '<td class="py-2 px-4 text-center">-</td>';
-                }).join('')}
-            </tr>
+    if (state.isTransposed) {
+        // Transposed view: People as rows, Items as columns, Summary as additional columns
+        tableHTML = `
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse min-w-max">
+                    <thead>
+                        <tr class="border-b">
+                            <th class="py-2 px-4">Person</th>
+                            ${state.items.map(item => `<th class="py-2 px-4 text-center">${item.name}<br><span class="text-xs text-gray-600">($${item.price.toFixed(2)})</span></th>`).join('')}
+                            <th class="py-2 px-4 text-center border-l-2 border-gray-400">Subtotal</th>
+                            <th class="py-2 px-4 text-center">Tax</th>
+                            <th class="py-2 px-4 text-center">Tip</th>
+                            <th class="py-2 px-4 text-center">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
         `;
-    });
 
-    // Summary rows
-    let grandTotal = 0;
-    ['Subtotal', 'Tax', 'Tip', 'Total'].forEach((summaryType, index) => {
-        const isTotal = summaryType === 'Total';
-        const borderClass = index === 0 ? 'border-t-2 border-gray-400 border-b summary-row' : 
-                           isTotal ? 'border-t-2 border-gray-400 summary-row' : 'border-b summary-row';
-        
-        tableHTML += `<tr class="${borderClass}"><td class="py-2 px-4 font-semibold">${summaryType}</td>`;
-        
+        // Person rows
         personTotals.forEach(person => {
             const personTax = person.subtotal * taxRate;
             const personTip = person.subtotal * tipRate;
             const personTotal = person.subtotal + personTax + personTip;
-            
-            let value;
-            switch(summaryType) {
-                case 'Subtotal': value = person.subtotal; break;
-                case 'Tax': value = personTax; break;
-                case 'Tip': value = personTip; break;
-                case 'Total': 
-                    value = personTotal;
-                    grandTotal += personTotal;
-                    break;
-            }
-            
-            const cellClass = isTotal ? 'font-bold' : '';
-            tableHTML += `<td class="py-2 px-4 text-center ${cellClass}">${value.toFixed(2)}</td>`;
-        });
-        tableHTML += '</tr>';
-    });
 
-    tableHTML += '</tbody></table></div>';
+            tableHTML += `
+                <tr class="border-b">
+                    <td class="py-2 px-4 font-medium">${person.name}</td>
+                    ${state.items.map(item => {
+                        const totalQuantities = Object.values(item.personQuantities || {}).reduce((sum, qty) => {
+                            const numQty = parseFloat(qty) || 0;
+                            return sum + numQty;
+                        }, 0);
+                        const pricePerUnit = totalQuantities > 0 ? item.price / totalQuantities : 0;
+                        const personQuantity = item.personQuantities?.[person.id];
+                        const numPersonQuantity = parseFloat(personQuantity) || 0;
+                        if (personQuantity && numPersonQuantity > 0) {
+                            const personAmount = numPersonQuantity * pricePerUnit;
+                            return `<td class="py-2 px-4 text-center">${numPersonQuantity}× = ${personAmount.toFixed(2)}</td>`;
+                        }
+                        return '<td class="py-2 px-4 text-center">-</td>';
+                    }).join('')}
+                    <td class="py-2 px-4 text-center border-l-2 border-gray-400">${person.subtotal.toFixed(2)}</td>
+                    <td class="py-2 px-4 text-center">${personTax.toFixed(2)}</td>
+                    <td class="py-2 px-4 text-center">${personTip.toFixed(2)}</td>
+                    <td class="py-2 px-4 text-center font-bold">${personTotal.toFixed(2)}</td>
+                </tr>
+            `;
+        });
+
+        tableHTML += '</tbody></table></div>';
+    } else {
+        // Original view: Items as rows, People as columns
+        tableHTML = `
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse min-w-max">
+                    <thead>
+                        <tr class="border-b">
+                            <th class="py-2 px-4">Item</th>
+                            ${personTotals.map(person => `<th class="py-2 px-4 text-center">${person.name}</th>`).join('')}
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        // Item rows
+        state.items.forEach(item => {
+            const totalQuantities = Object.values(item.personQuantities || {}).reduce((sum, qty) => {
+                const numQty = parseFloat(qty) || 0;
+                return sum + numQty;
+            }, 0);
+            const pricePerUnit = totalQuantities > 0 ? item.price / totalQuantities : 0;
+
+            tableHTML += `
+                <tr class="border-b">
+                    <td class="py-2 px-4 font-medium">${item.name}<br><span class="text-sm text-gray-600">($${item.price.toFixed(2)})</span></td>
+                    ${personTotals.map(person => {
+                        const personQuantity = item.personQuantities?.[person.id];
+                        const numPersonQuantity = parseFloat(personQuantity) || 0;
+                        if (personQuantity && numPersonQuantity > 0) {
+                            const personAmount = numPersonQuantity * pricePerUnit;
+                            return `<td class="py-2 px-4 text-center">${numPersonQuantity}× = ${personAmount.toFixed(2)}</td>`;
+                        }
+                        return '<td class="py-2 px-4 text-center">-</td>';
+                    }).join('')}
+                </tr>
+            `;
+        });
+
+        // Summary rows
+        let grandTotal = 0;
+        ['Subtotal', 'Tax', 'Tip', 'Total'].forEach((summaryType, index) => {
+            const isTotal = summaryType === 'Total';
+            const borderClass = index === 0 ? 'border-t-2 border-gray-400 border-b summary-row' :
+                               isTotal ? 'border-t-2 border-gray-400 summary-row' : 'border-b summary-row';
+
+            tableHTML += `<tr class="${borderClass}"><td class="py-2 px-4 font-semibold">${summaryType}</td>`;
+
+            personTotals.forEach(person => {
+                const personTax = person.subtotal * taxRate;
+                const personTip = person.subtotal * tipRate;
+                const personTotal = person.subtotal + personTax + personTip;
+
+                let value;
+                switch(summaryType) {
+                    case 'Subtotal': value = person.subtotal; break;
+                    case 'Tax': value = personTax; break;
+                    case 'Tip': value = personTip; break;
+                    case 'Total':
+                        value = personTotal;
+                        grandTotal += personTotal;
+                        break;
+                }
+
+                const cellClass = isTotal ? 'font-bold' : '';
+                tableHTML += `<td class="py-2 px-4 text-center ${cellClass}">${value.toFixed(2)}</td>`;
+            });
+            tableHTML += '</tr>';
+        });
+
+        tableHTML += '</tbody></table></div>';
+    }
 
     // Bill summary
     const totalTax = totalBillSubtotal * taxRate;
     const totalTip = totalBillSubtotal * tipRate;
-    
+    let grandTotal = 0;
+    personTotals.forEach(person => {
+        const personTax = person.subtotal * taxRate;
+        const personTip = person.subtotal * tipRate;
+        grandTotal += person.subtotal + personTax + personTip;
+    });
+
     const summaryHTML = `
         <div class="mt-6 p-4 bg-gray-100 rounded-lg w-full">
             <h3 class="font-bold text-lg">Bill Summary</h3>
@@ -723,7 +792,8 @@ function loadState() {
                 nextPersonId: loadedState.nextPersonId || 0,
                 nextItemId: loadedState.nextItemId || 0,
                 tax: loadedState.tax !== undefined ? loadedState.tax : 0,
-                tip: loadedState.tip !== undefined ? loadedState.tip : 10
+                tip: loadedState.tip !== undefined ? loadedState.tip : 10,
+                isTransposed: loadedState.isTransposed || false
             });
             
             // Sync HTML inputs
@@ -753,7 +823,8 @@ function clearState() {
             nextPersonId: 0,
             nextItemId: 0,
             tax: 0,
-            tip: 10
+            tip: 10,
+            isTransposed: false
         });
 
         dom.personNameInput.value = '';
